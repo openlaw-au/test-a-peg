@@ -88,7 +88,7 @@ CodeMirror.registerHelper("lint", "pest", function (text) {
 });
 
 const grammar = document.querySelector<HTMLTextAreaElement>(".editor-grammar")!;
-const myCodeMirror = CodeMirror.fromTextArea(grammar, {
+export const myCodeMirror = CodeMirror.fromTextArea(grammar, {
   mode: "pest",
   lint: "pest",
   theme: "pest",
@@ -104,6 +104,7 @@ function doFormat() {
 
   const grammar = myCodeMirror.getValue();
   const formatted = format(grammar);
+  console.log(formatted);
   myCodeMirror.setValue(formatted);
 }
 

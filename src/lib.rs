@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use lazy_static::lazy_static;
 use pest::error::{Error, ErrorVariant, InputLocation};
 use pest::iterators::Pair;
 
@@ -330,4 +331,106 @@ pub fn format(grammar: JsValue) -> JsValue {
     let fmt = pest_fmt::Formatter::new(&input);
     serde_wasm_bindgen::to_value(&fmt.format().unwrap())
         .expect_throw("could not serialize grammar results")
+}
+
+///
+/// BEGIN OL Directory Rust Testing Regime
+///
+/// Each representation test is of the format:
+///     - JADE document ID (&str)
+///     - Test representation string (&str)
+///     - Expected output (&str)
+///
+/// For each representation string, the stringified parsed output is compared
+/// with the expected output.
+///
+/// On success, the test sets the success flag to true (SECOND ARG) and the
+///             error flag to false (THIRD ARG)
+/// On failure, the test sets the success flag to false (SECOND ARG) and the
+///             error flag to false (SECOND ARG)
+/// On error, the test sets the success flag to false (SECOND ARG) and the
+///           error flag to true (THIRD ARG)
+/// In any case, the test sets the id (FIRST ARG), parsed output (FOURTH ARG)
+///              and the expected output (FIFTH ARG)
+///
+struct Test {
+    abbrv: &'static str,
+    id: &'static str,
+    input: &'static str,
+    expected_output: &'static str,
+}
+
+lazy_static! {
+    static ref TEST_REPRESENTATION_STRINGS: Vec<Test> = Vec::from([Test {
+        abbrv: "2024/NSWSC",
+        id: "1065814",
+        input: r#"	Counsel:
+    Mr J Kelly SC and Mr S Shepherd (Applicants)
+    Mr P Afshar (Respondent)
+    Solicitors:
+    Jeresyn Legal
+    KB Legals"#,
+        expected_output: r#"- representation_definition
+    - representation
+        - representation_type: "Counsel"
+        - natural_entity_name
+        - honorific: "Mr"
+        - initials: "J "
+        - surname: "Kelly"
+        - postnomial: "SC"
+        - natural_entity_name
+        - honorific: "Mr"
+        - initials: "S "
+        - surname: "Shepherd"
+        - parties > party_type: "Applicants"
+    - representation
+        - natural_entity_name
+        - honorific: "Mr"
+        - initials: "P "
+        - surname: "Afshar"
+        - parties > party_type: "Respondent"
+    - representation
+        - representation_type: "Solicitors"
+        - natural_entity_name
+        - full_first_name: "Jeresyn"
+        - surname: "Legal"
+        - natural_entity_name
+        - initials: "KB "
+        - surname: "Legals""#,
+    },]);
+}
+
+#[wasm_bindgen]
+pub fn test() -> JsValue {
+    let _ = element::<HtmlTextAreaElement>(".editor-input-text");
+    let vm = unsafe { VM.as_ref().expect_throw("no VM") };
+
+    let mut results = Vec::new();
+
+    for Test {
+        abbrv,
+        id,
+        input,
+        expected_output,
+    } in TEST_REPRESENTATION_STRINGS.iter()
+    {
+        match vm.parse("representation_definition", input) {
+            Ok(pairs) => {
+                let lines: Vec<_> = pairs.map(|pair| format_pair(pair, 0, true)).collect();
+
+                let lines = lines.join("\n");
+
+                let fmt_line: String = lines.split('\n').map(|e| e.trim()).collect();
+
+                let fmt_cmp: String = expected_output.split('\n').map(|e| e.trim()).collect();
+
+                let success = fmt_line == fmt_cmp;
+
+                results.push((id, success, false, input, lines, expected_output));
+            }
+            Err(_) => results.push((id, false, true, input, String::new(), expected_output)),
+        };
+    }
+
+    serde_wasm_bindgen::to_value(&results).expect_throw("could not serialise grammar results")
 }
